@@ -1,0 +1,10 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import { useRoute,useRouter } from 'vue-router'
+import { LockKeyhole, Mail, ShieldCheck } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
+import { errorMessage } from '@/utils/errors'
+const email=ref('admin@example.com'),password=ref('ChangeMe123!'),error=ref('');const auth=useAuthStore();const router=useRouter();const route=useRoute()
+async function submit(){error.value='';try{await auth.login(email.value,password.value);router.replace(String(route.query.redirect||'/dashboard'))}catch(e){error.value=errorMessage(e)}}
+</script>
+<template><div class="login-page"><div class="login-visual"><div class="login-badge"><ShieldCheck :size="18"/> Khu vực quản trị riêng biệt</div><h1>Vận hành cửa hàng<br/>từ một nơi duy nhất.</h1><p>Quản lý sản phẩm, đơn hàng, nội dung CMS, khách hàng và bố cục trang chủ mà không ảnh hưởng tới website người dùng.</p><div class="login-points"><div><strong>Public Web</strong><span>NuxtJS · độc lập</span></div><div><strong>Admin</strong><span>VueJS · độc lập</span></div><div><strong>API</strong><span>Laravel · PostgreSQL</span></div></div></div><div class="login-panel"><form class="login-card" @submit.prevent="submit"><div class="login-logo">EC</div><div class="login-title"><h2>Đăng nhập quản trị</h2><p>Chỉ tài khoản có quyền Admin mới được truy cập.</p></div><div v-if="error" class="alert alert-danger">{{error}}</div><label class="field"><span>Email quản trị</span><div class="input-icon"><Mail :size="18"/><input v-model="email" type="email" autocomplete="username" required placeholder="admin@example.com"/></div></label><label class="field"><span>Mật khẩu</span><div class="input-icon"><LockKeyhole :size="18"/><input v-model="password" type="password" autocomplete="current-password" required placeholder="••••••••"/></div></label><button class="btn btn-primary btn-block btn-lg" :disabled="auth.loading">{{auth.loading?'Đang xác thực...':'Đăng nhập Admin'}}</button><small class="login-note">Dev mặc định: admin@example.com / ChangeMe123!</small></form></div></div></template>

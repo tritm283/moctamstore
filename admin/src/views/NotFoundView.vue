@@ -1,0 +1,1 @@
+<template><div class="not-found"><div><h1>404</h1><h2>Không tìm thấy trang</h2><p>Đường dẫn quản trị này không tồn tại.</p><router-link class="btn btn-primary" to="/dashboard">Về tổng quan</router-link></div></div></template>

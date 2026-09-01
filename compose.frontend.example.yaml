@@ -1,0 +1,42 @@
+# Optional overlay khi bạn đã có source frontend ở:
+#   ./frontend  -> NuxtJS storefront
+#   ./admin     -> VueJS admin
+# Chạy cùng base compose:
+# docker compose -f compose.yaml -f compose.frontend.example.yaml up -d --build
+
+services:
+  storefront:
+    image: node:22-alpine
+    working_dir: /app
+    environment:
+      NUXT_PUBLIC_API_BASE: http://localhost:8000/api/v1
+      HOST: 0.0.0.0
+      PORT: 3000
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 3000"
+    volumes:
+      - ./frontend:/app
+      - storefront-node-modules:/app/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      app:
+        condition: service_healthy
+
+  admin-web:
+    image: node:22-alpine
+    working_dir: /app
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000/api/admin/v1
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    volumes:
+      - ./admin:/app
+      - admin-node-modules:/app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  storefront-node-modules:
+  admin-node-modules:
