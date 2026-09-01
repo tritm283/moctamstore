@@ -13,6 +13,33 @@ mkdir -p \
 
 chmod -R ug+rwX bootstrap/cache storage 2>/dev/null || true
 
+run_composer_with_retry() {
+  attempt=1
+  max_attempts=5
+
+  while [ "$attempt" -le "$max_attempts" ]; do
+    echo "[docker] Composer attempt ${attempt}/${max_attempts}..."
+
+    if [ -f composer.lock ]; then
+      if composer install --no-interaction --prefer-dist --no-progress; then
+        return 0
+      fi
+    else
+      if composer update --no-interaction --prefer-dist --no-progress; then
+        return 0
+      fi
+    fi
+
+    if [ "$attempt" -eq "$max_attempts" ]; then
+      echo "[docker] Composer failed after ${max_attempts} attempts." >&2
+      return 1
+    fi
+
+    attempt=$((attempt + 1))
+    sleep 5
+  done
+}
+
 if [ "${APP_INIT:-1}" = "1" ]; then
   echo "[docker] Waiting for PostgreSQL at ${DB_HOST:-postgres}:${DB_PORT:-5432}..."
   ATTEMPT=0
@@ -33,18 +60,9 @@ if [ "${APP_INIT:-1}" = "1" ]; then
     sleep 1
   done
 
-  if [ ! -f vendor/autoload.php ]; then
-    if [ -f composer.lock ]; then
-      echo "[docker] Installing Composer dependencies from composer.lock..."
-      composer install --no-interaction --prefer-dist
-    else
-      echo "[docker] composer.lock not found; resolving dependencies and creating lock file..."
-      composer update --no-interaction --prefer-dist
-    fi
-  fi
+  run_composer_with_retry
 
-  # Clear file-based Laravel caches without touching the database cache table
-  # before the first migration has created it.
+  # These commands use file cache and are safe before framework DB tables exist.
   php artisan config:clear
   php artisan route:clear
   php artisan view:clear
