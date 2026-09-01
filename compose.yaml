@@ -11,7 +11,6 @@ x-app-env: &app-env
   LOG_CHANNEL: stack
   LOG_LEVEL: debug
 
-  # Storefront + Admin cùng origin qua gateway
   FRONTEND_URL: "${FRONTEND_URL:-http://localhost:8000}"
   ADMIN_URL: "${ADMIN_URL:-http://localhost:8000}"
   SANCTUM_STATEFUL_DOMAINS: "${SANCTUM_STATEFUL_DOMAINS:-localhost:8000,127.0.0.1:8000}"
@@ -42,6 +41,11 @@ x-app-env: &app-env
 
   MEDIA_MAX_KB: "${MEDIA_MAX_KB:-10240}"
 
+x-laravel-volumes: &laravel-volumes
+  - ./:/var/www/html
+  - vendor:/var/www/html/vendor
+  - composer-cache:/tmp/composer/cache
+
 services:
   gateway:
     image: nginx:1.27-alpine
@@ -58,7 +62,10 @@ services:
         condition: service_started
     restart: unless-stopped
 
-  app:
+  # One-shot bootstrap service. Composer, migrations and seed run here before
+  # the HTTP app is allowed to start, so long initialization cannot make the
+  # Laravel HTTP container fail its healthcheck.
+  init:
     build:
       context: .
       dockerfile: Dockerfile.dev
@@ -67,21 +74,32 @@ services:
       APP_INIT: "1"
       AUTO_MIGRATE: "${AUTO_MIGRATE:-true}"
       AUTO_SEED: "${AUTO_SEED:-true}"
-    volumes:
-      - ./:/var/www/html
-      - vendor:/var/www/html/vendor
-      - composer-cache:/tmp/composer/cache
-    expose:
-      - "8000"
+    command: ["sh", "-lc", "echo '[docker] Laravel initialization completed successfully.'"]
+    volumes: *laravel-volumes
     depends_on:
       postgres:
         condition: service_healthy
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    environment:
+      <<: *app-env
+      APP_INIT: "0"
+    volumes: *laravel-volumes
+    expose:
+      - "8000"
+    depends_on:
+      init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/up"]
       interval: 5s
       timeout: 3s
       retries: 20
-      start_period: 30s
+      start_period: 10s
     restart: unless-stopped
 
   storefront:
@@ -129,8 +147,6 @@ services:
       POSTGRES_USER: "${POSTGRES_USER:-postgres}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
       TZ: Asia/Bangkok
-    # PostgreSQL chỉ mở trong Docker network. Laravel/pgAdmin truy cập qua postgres:5432.
-    # Không publish 5432 ra Windows để tránh xung đột với PostgreSQL cài sẵn hoặc reserved ports.
     expose:
       - "5432"
     volumes:
@@ -151,10 +167,7 @@ services:
       <<: *app-env
       APP_INIT: "0"
     command: ["php", "artisan", "queue:work", "--sleep=1", "--tries=3", "--timeout=90"]
-    volumes:
-      - ./:/var/www/html
-      - vendor:/var/www/html/vendor
-      - composer-cache:/tmp/composer/cache
+    volumes: *laravel-volumes
     depends_on:
       app:
         condition: service_healthy
@@ -169,10 +182,7 @@ services:
       <<: *app-env
       APP_INIT: "0"
     command: ["php", "artisan", "schedule:work"]
-    volumes:
-      - ./:/var/www/html
-      - vendor:/var/www/html/vendor
-      - composer-cache:/tmp/composer/cache
+    volumes: *laravel-volumes
     depends_on:
       app:
         condition: service_healthy
