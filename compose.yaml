@@ -129,8 +129,10 @@ services:
       POSTGRES_USER: "${POSTGRES_USER:-postgres}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
       TZ: Asia/Bangkok
-    ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    # PostgreSQL chỉ mở trong Docker network. Laravel/pgAdmin truy cập qua postgres:5432.
+    # Không publish 5432 ra Windows để tránh xung đột với PostgreSQL cài sẵn hoặc reserved ports.
+    expose:
+      - "5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
